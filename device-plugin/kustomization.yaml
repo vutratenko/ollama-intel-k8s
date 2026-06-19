@@ -2,11 +2,10 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
 # Intel GPU device plugin в namespace ollama (ArgoCD AppProject ollama).
+# Опционален: Ollama использует GPU через hostPath /dev/dri без device plugin.
 #
-# Предварительно установите NFD — см. ../nfd/
-# Затем дождитесь метки intel.feature.node.kubernetes.io/gpu=true на целевой ноде.
-#
-# Чтобы plugin работал на всех GPU-нодах — уберите gpu-plugin-target-node.yaml из patches.
+# Привязка к ноде — через TARGET_NODE в configmap.yaml (kustomize replacement).
+# Чтобы plugin работал на всех amd64-нодах — уберите gpu-plugin-target-node.yaml из patches.
 
 namespace: ollama
 

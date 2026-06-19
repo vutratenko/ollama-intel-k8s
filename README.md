@@ -21,7 +21,7 @@ Kubernetes-манифесты для развёртывания [Ollama](https:/
 ## Возможности
 
 - **StatefulSet** с постоянным хранилищем моделей (PVC)
-- **Intel GPU device plugin** + Node Feature Discovery (NFD)
+- **Intel GPU device plugin** (опционально, для `gpu.intel.com/*` в scheduler)
 - **Привязка к конкретной ноде** через `nodeAffinity` / `nodeSelector`
 - **Ingress** (nginx) с увеличенными таймаутами для длинных генераций
 - **Kustomize** для централизованной настройки образа, namespace и имени ноды
@@ -48,17 +48,14 @@ flowchart TB
         end
 
         subgraph ollama_ns ["ollama"]
-            PLUGIN["DaemonSet intel-gpu-plugin"]
+            PLUGIN["DaemonSet intel-gpu-plugin optional"]
         end
-
-        NFD["NFD node-feature-discovery"]
     end
 
     U --> ING --> SVC --> STS --> POD
     STS --> PVC
     CM --> STS
-    NFD -->|"метка gpu=true"| gpu_node
-    PLUGIN -->|"gpu.intel.com/i915"| gpu_node
+    PLUGIN -.-> gpu_node
     POD --> DRI --> GPU
 ```
 
@@ -66,8 +63,7 @@ flowchart TB
 
 | Компонент | Namespace | Назначение |
 |-----------|-----------|------------|
-| NFD | `node-feature-discovery` | Обнаруживает Intel GPU и проставляет метки на нодах |
-| Intel GPU plugin | `ollama` | Регистрирует GPU как ресурс `gpu.intel.com/i915` или `gpu.intel.com/xe` |
+| Intel GPU plugin (опционально) | `ollama` | Регистрирует `gpu.intel.com/i915` / `gpu.intel.com/xe` |
 | Ollama StatefulSet | `ollama` | Запускает Ollama с IPEX-LLM backend |
 | Service | `ollama` | Внутренний доступ к API на порту 11434 |
 | Ingress | `ollama` | Внешний HTTP-доступ |
@@ -93,10 +89,6 @@ flowchart TB
   - GPU: доступ через `hostPath` `/dev/dri` (device plugin опционален)
   - Disk: 50 GiB+ для моделей (PVC `nfs-ssd`)
 
-### Сеть
-
-- При `kubectl apply -k nfd/` нужен доступ к `github.com` (remote kustomize resource)
-
 ## Структура репозитория
 
 ```
@@ -107,56 +99,28 @@ flowchart TB
 ├── statefulset.yaml
 ├── service.yaml
 ├── ingress.yaml
-├── nfd/
-│   └── kustomization.yaml      # Node Feature Discovery (отдельно)
-├── device-plugin/
-│   ├── kustomization.yaml      # Intel GPU plugin (namespace ollama)
+├── device-plugin/              # Intel GPU plugin (опционально)
+│   ├── kustomization.yaml
 │   ├── configmap.yaml
 │   ├── intel-gpu-plugin.yaml
 │   └── gpu-plugin-target-node.yaml
 └── argocd/
-    ├── application-device-plugin.yaml  # project: ollama
-    ├── application-nfd.yaml            # project: cluster-addons
-    └── appproject-cluster-addons.yaml
+    ├── application-device-plugin.yaml
+    └── README.md
 ```
 
 ## ArgoCD
 
-AppProject **`ollama`** разрешает только namespace **`ollama`** и **не допускает cluster-scoped ресурсы** (ClusterRole и т.п.). Поэтому NFD нельзя деплоить через project `ollama`.
+| Application | path | project | destination |
+|-------------|------|---------|-------------|
+| Ollama | `.` | `ollama` | `ollama` |
+| Intel GPU plugin (опционально) | `device-plugin` | `ollama` | `ollama` |
 
-| Application | path | project | destination namespace |
-|-------------|------|---------|----------------------|
-| `ollama` (Ollama) | `.` | `ollama` | `ollama` |
-| `ollama-device-plugin` | `device-plugin` | `ollama` | `ollama` |
-| `ollama-nfd` | `nfd` | **`cluster-addons`** | `node-feature-discovery` |
+NFD не используется — нода с GPU задаётся через `TARGET_NODE` в ConfigMap.
 
 ```bash
-ARGOCD_NS=argocd   # или shturval-cd
-
-# 1. Создать AppProject (первый раз)
-kubectl apply -f argocd/appproject-cluster-addons.yaml
-
-# 1b. ОБНОВИТЬ существующий AppProject (если apply даёт resourceVersion error):
-kubectl patch appproject cluster-addons -n "$ARGOCD_NS" \
-  --type merge --patch-file argocd/appproject-cluster-addons-patch.yaml
-
-# 2. Проверить whitelist
-kubectl get appproject cluster-addons -n "$ARGOCD_NS" -o yaml | grep -A6 clusterResourceWhitelist
-
-# 3. Applications
-kubectl apply -f argocd/application-nfd.yaml
-kubectl apply -f argocd/application-device-plugin.yaml
+kubectl apply -f argocd/application-device-plugin.yaml   # опционально
 ```
-
-NFD нужно установить **до** device plugin (метка `intel.feature.node.kubernetes.io/gpu=true`).
-
-> **Если ArgoCD всё равно блокирует ClusterRole/CRD** — установите NFD вручную один раз:
->
-> ```bash
-> kubectl apply -k nfd/
-> ```
->
-> Это нормальный путь: NFD — кластерная инфраструктура, не обязана идти через AppProject `ollama`.
 
 ## Быстрый старт
 
@@ -176,14 +140,14 @@ cd ollama-intel-k8s
 ```yaml
 data:
   DEVICE: "Arc"              # Arc | Flex | Max | iGPU
-  TARGET_NODE: "gpu-node-01" # kubectl get nodes
+  TARGET_NODE: "cornertop"   # kubectl get nodes
 ```
 
 **`device-plugin/configmap.yaml`**:
 
 ```yaml
 data:
-  TARGET_NODE: "gpu-node-01"
+  TARGET_NODE: "cornertop"
 ```
 
 Также при необходимости измените:
@@ -191,32 +155,20 @@ data:
 - `ingress.yaml` — хост (`ollama.example.com`) и TLS
 - `statefulset.yaml` — `storageClassName`, лимиты CPU/RAM, тип GPU-ресурса
 
-### 3. Установить NFD и Intel GPU device plugin
+### 3. (Опционально) Intel GPU device plugin
+
+Нужен только если хотите ресурс `gpu.intel.com/*` в scheduler. **Ollama работает без него** (GPU через `/dev/dri`).
 
 ```bash
-# 1. Node Feature Discovery
-kubectl apply -k nfd/
-
-# 2. Дождаться метки GPU на целевой ноде
-kubectl get nodes -l intel.feature.node.kubernetes.io/gpu=true
-
-# 3. Intel GPU device plugin (namespace ollama)
 kubectl apply -k device-plugin/
-```
-
-```bash
 kubectl -n ollama get pods -l app=intel-gpu-plugin -o wide
-kubectl -n node-feature-discovery get pods
 ```
 
-Проверьте, что GPU зарегистрирован:
+Проверка регистрации GPU (если plugin установлен):
 
 ```bash
-kubectl describe node cornertop | grep -A5 "Allocatable"
-# Ожидается: gpu.intel.com/i915: 1  (или gpu.intel.com/xe: 1)
+kubectl describe node cornertop | grep -E "gpu\.intel"
 ```
-
-> **NFD уже установлен?** Пропустите `kubectl apply -k nfd/`.
 
 ### 4. Развернуть Ollama
 
@@ -254,7 +206,7 @@ curl http://ollama.example.com/api/tags
 | Параметр | По умолчанию | Описание |
 |----------|--------------|----------|
 | `DEVICE` | `Arc` | Тип Intel GPU для `ipex-llm-init` |
-| `TARGET_NODE` | `gpu-node-01` | Имя ноды; подставляется в `nodeAffinity` через kustomize |
+| `TARGET_NODE` | `cornertop` | Имя ноды; подставляется в `nodeAffinity` через kustomize |
 | `INTEL_GPU_RESOURCE` | `gpu.intel.com/i915` | Справочное значение; ресурс задаётся в `statefulset.yaml` |
 | `ONEAPI_DEVICE_SELECTOR` | `level_zero:0` | Выбор GPU при нескольких устройствах на ноде |
 | `OLLAMA_HOST` | `0.0.0.0:11434` | Адрес прослушивания API |
@@ -451,7 +403,7 @@ kubectl -n ollama logs -f ollama-intel-0
 
 ```bash
 kubectl -n ollama logs -l app=intel-gpu-plugin
-kubectl describe node <node-name> | grep intel.feature
+kubectl describe node cornertop
 ```
 
 Проверьте драйвер на хосте:
