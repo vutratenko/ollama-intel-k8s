@@ -116,25 +116,32 @@ flowchart TB
 │   └── gpu-plugin-target-node.yaml
 └── argocd/
     ├── application-device-plugin.yaml  # project: ollama
-    └── application-nfd.yaml            # project: default
+    ├── application-nfd.yaml            # project: cluster-addons
+    └── appproject-cluster-addons.yaml
 ```
 
 ## ArgoCD
 
-AppProject **`ollama`** разрешает только namespace **`ollama`**. Поэтому:
+AppProject **`ollama`** разрешает только namespace **`ollama`** и **не допускает cluster-scoped ресурсы** (ClusterRole и т.п.). Поэтому NFD нельзя деплоить через project `ollama`.
 
 | Application | path | project | destination namespace |
 |-------------|------|---------|----------------------|
 | `ollama` (Ollama) | `.` | `ollama` | `ollama` |
 | `ollama-device-plugin` | `device-plugin` | `ollama` | `ollama` |
-| `ollama-nfd` | `nfd` | `default` | `node-feature-discovery` |
+| `ollama-nfd` | `nfd` | **`cluster-addons`** | `node-feature-discovery` |
 
 ```bash
+# 1. Создать AppProject с правами на ClusterRole (один раз)
+kubectl apply -f argocd/appproject-cluster-addons.yaml
+
+# 2. Applications
 kubectl apply -f argocd/application-nfd.yaml
 kubectl apply -f argocd/application-device-plugin.yaml
 ```
 
 NFD нужно установить **до** device plugin (метка `intel.feature.node.kubernetes.io/gpu=true`).
+
+> **Альтернатива без ArgoCD:** `kubectl apply -k nfd/`
 
 ## Быстрый старт
 

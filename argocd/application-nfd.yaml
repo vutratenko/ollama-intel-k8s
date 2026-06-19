@@ -4,8 +4,8 @@ metadata:
   name: ollama-nfd
   namespace: argocd
 spec:
-  # NFD создаёт ресурсы в node-feature-discovery — вне AppProject ollama.
-  project: default
+  # NFD требует ClusterRole/ClusterRoleBinding — project ollama не подходит.
+  project: cluster-addons
   source:
     repoURL: https://github.com/vutratenko/ollama-intel-k8s.git
     targetRevision: master
