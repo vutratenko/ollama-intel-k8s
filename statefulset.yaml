@@ -32,6 +32,9 @@ spec:
       # Альтернатива: раскомментируйте nodeSelector и закомментируйте affinity выше.
       # nodeSelector:
       #   kubernetes.io/hostname: cornertop
+      # cornertop имеет taint — без tolerations scheduler отклоняет единственную подходящую ноду.
+      tolerations:
+        - operator: Exists
       terminationGracePeriodSeconds: 60
       containers:
         - name: ollama

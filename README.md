@@ -380,6 +380,7 @@ kubectl -n ollama describe pod ollama-intel-0
 |---------|---------|
 | `Insufficient gpu.intel.com/i915` | Проверить GPU plugin и метки ноды |
 | `didn't match node affinity` | Проверить `TARGET_NODE` в ConfigMap |
+| `had untolerated taint(s)` | Посмотреть taint: `kubectl describe node cornertop \| grep Taint`; в манифесте уже есть `tolerations: operator: Exists` |
 | `PersistentVolumeClaim not bound` | Проверить StorageClass на целевой ноде |
 
 ### GPU не используется
