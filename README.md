@@ -30,35 +30,35 @@ Kubernetes-манифесты для развёртывания [Ollama](https:/
 
 ```mermaid
 flowchart TB
-    subgraph Client
-        U[Клиент / Open WebUI / curl]
+    subgraph client ["Client"]
+        U["Клиент, Open WebUI, curl"]
     end
 
-    subgraph K8s
-        ING[Ingress nginx<br/>ollama.example.com]
-        SVC[Service ClusterIP<br/>:11434]
-        STS[StatefulSet ollama-intel]
-        PVC[(PVC models<br/>100Gi)]
-        CM[ConfigMap<br/>ollama-intel-config]
+    subgraph k8s ["Kubernetes"]
+        ING["Ingress nginx"]
+        SVC["Service :11434"]
+        STS["StatefulSet ollama-intel"]
+        PVC[("PVC models 100Gi")]
+        CM["ConfigMap ollama-intel-config"]
 
-        subgraph GPU_Node["Нода с Intel GPU"]
-            POD[Pod ollama-intel-0<br/>ipex-llm-inference-cpp-xpu]
-            DRI[/dev/dri hostPath]
-            GPU[Intel GPU]
+        subgraph gpu_node ["Нода с Intel GPU"]
+            POD["Pod ollama-intel-0"]
+            DRI["dev-dri hostPath"]
+            GPU["Intel GPU"]
         end
 
-        subgraph kube_system["kube-system"]
-            PLUGIN[DaemonSet<br/>intel-gpu-plugin]
+        subgraph kube_system ["kube-system"]
+            PLUGIN["DaemonSet intel-gpu-plugin"]
         end
 
-        NFD[NFD<br/>node-feature-discovery]
+        NFD["NFD node-feature-discovery"]
     end
 
     U --> ING --> SVC --> STS --> POD
     STS --> PVC
     CM --> STS
-    NFD -->|метка gpu=true| GPU_Node
-    PLUGIN -->|gpu.intel.com/i915| GPU_Node
+    NFD -->|"метка gpu=true"| gpu_node
+    PLUGIN -->|"gpu.intel.com/i915"| gpu_node
     POD --> DRI --> GPU
 ```
 
