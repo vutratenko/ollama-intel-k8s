@@ -151,7 +151,7 @@ spec:
       spec:
         accessModes:
           - ReadWriteOnce
-        # Укажите StorageClass, доступный на целевой ноде.
+        # StorageClass nfs-ssd (NFS).
         storageClassName: nfs-ssd
         resources:
           requests:
