@@ -1,0 +1,31 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ollama-intel
+  labels:
+    app.kubernetes.io/name: ollama-intel
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    nginx.ingress.kubernetes.io/proxy-body-size: "0"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
+    # Раскомментируйте для TLS через cert-manager:
+    # cert-manager.io/cluster-issuer: corp-acme
+    # ingress.kubernetes.io/force-ssl-redirect: "true"
+spec:
+  ingressClassName: nginx
+  # tls:
+  #   - hosts:
+  #       - ollama.example.com
+  #     secretName: ollama-intel-tls
+  rules:
+    - host: ollama.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: ollama-intel
+                port:
+                  number: 11434

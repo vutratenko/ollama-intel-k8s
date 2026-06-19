@@ -1,0 +1,155 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: ollama-intel
+  labels:
+    app.kubernetes.io/name: ollama-intel
+    app.kubernetes.io/component: inference
+spec:
+  serviceName: ollama-intel
+  replicas: 1
+  podManagementPolicy: OrderedReady
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: ollama-intel
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: ollama-intel
+        app.kubernetes.io/component: inference
+    spec:
+      # Привязка к конкретной ноде с Intel GPU.
+      # Замените TARGET_NODE в configmap.yaml на имя вашей ноды.
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: kubernetes.io/hostname
+                    operator: In
+                    values:
+                      - gpu-node-01
+      # Альтернатива: раскомментируйте nodeSelector и закомментируйте affinity выше.
+      # nodeSelector:
+      #   kubernetes.io/hostname: gpu-node-01
+      terminationGracePeriodSeconds: 60
+      containers:
+        - name: ollama
+          image: intelanalytics/ipex-llm-inference-cpp-xpu:2.2.0-SNAPSHOT
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 11434
+              protocol: TCP
+          env:
+            - name: PATH
+              value: /llm/ollama:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+            - name: DEVICE
+              valueFrom:
+                configMapKeyRef:
+                  name: ollama-intel-config
+                  key: DEVICE
+            - name: OLLAMA_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: ollama-intel-config
+                  key: OLLAMA_HOST
+            - name: OLLAMA_NUM_GPU
+              valueFrom:
+                configMapKeyRef:
+                  name: ollama-intel-config
+                  key: OLLAMA_NUM_GPU
+            - name: ZES_ENABLE_SYSMAN
+              valueFrom:
+                configMapKeyRef:
+                  name: ollama-intel-config
+                  key: ZES_ENABLE_SYSMAN
+            - name: no_proxy
+              valueFrom:
+                configMapKeyRef:
+                  name: ollama-intel-config
+                  key: no_proxy
+            - name: OLLAMA_INTEL_GPU
+              valueFrom:
+                configMapKeyRef:
+                  name: ollama-intel-config
+                  key: OLLAMA_INTEL_GPU
+            - name: ONEAPI_DEVICE_SELECTOR
+              valueFrom:
+                configMapKeyRef:
+                  name: ollama-intel-config
+                  key: ONEAPI_DEVICE_SELECTOR
+          command:
+            - /bin/bash
+            - -c
+          args:
+            - |
+              set -euo pipefail
+              cd /llm/scripts/
+              source ipex-llm-init --gpu --device "${DEVICE}"
+              bash start-ollama.sh
+              exec tail -f /llm/ollama/ollama.log
+          resources:
+            requests:
+              cpu: "4"
+              memory: 16Gi
+            limits:
+              cpu: "16"
+              memory: 32Gi
+              # Требует Intel GPU device plugin:
+              # https://github.com/intel/intel-device-plugins-for-kubernetes
+              # Для xe KMD замените на gpu.intel.com/xe: "1"
+              gpu.intel.com/i915: "1"
+          securityContext:
+            # Некоторые кластеры требуют privileged для прямого доступа к /dev/dri.
+            # Если device plugin с CDI работает без ошибок — можно выставить false.
+            privileged: true
+          volumeMounts:
+            - name: models
+              mountPath: /root/.ollama
+            - name: dev-dri
+              mountPath: /dev/dri
+            - name: dshm
+              mountPath: /dev/shm
+          startupProbe:
+            httpGet:
+              path: /
+              port: http
+            failureThreshold: 30
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 60
+            periodSeconds: 30
+            timeoutSeconds: 10
+      volumes:
+        - name: dev-dri
+          hostPath:
+            path: /dev/dri
+            type: Directory
+        - name: dshm
+          emptyDir:
+            medium: Memory
+            sizeLimit: 16Gi
+  volumeClaimTemplates:
+    - metadata:
+        name: models
+        labels:
+          app.kubernetes.io/name: ollama-intel
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        # Укажите StorageClass, доступный на целевой ноде.
+        storageClassName: local-path
+        resources:
+          requests:
+            storage: 100Gi

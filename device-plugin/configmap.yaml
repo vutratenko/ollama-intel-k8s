@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: device-plugin-config
+  labels:
+    app.kubernetes.io/name: intel-gpu-device-plugin
+data:
+  # Имя ноды с Intel GPU (kubectl get nodes).
+  # Используется для ограничения DaemonSet plugin только этой нодой.
+  TARGET_NODE: "gpu-node-01"

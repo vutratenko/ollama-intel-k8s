@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ollama-intel-config
+  labels:
+    app.kubernetes.io/name: ollama-intel
+data:
+  # Тип Intel GPU: Arc | Flex | Max | iGPU
+  DEVICE: "Arc"
+  # Имя ноды кластера с Intel GPU (kubectl get nodes)
+  TARGET_NODE: "gpu-node-01"
+  # KMD-драйвер GPU на ноде: i915 (legacy) или xe (новые ядра)
+  INTEL_GPU_RESOURCE: "gpu.intel.com/i915"
+  # Выбор конкретного GPU при нескольких устройствах (0 — первый dGPU)
+  ONEAPI_DEVICE_SELECTOR: "level_zero:0"
+  OLLAMA_HOST: "0.0.0.0:11434"
+  OLLAMA_NUM_GPU: "999"
+  ZES_ENABLE_SYSMAN: "1"
+  no_proxy: "localhost,127.0.0.1"
+  OLLAMA_INTEL_GPU: "true"

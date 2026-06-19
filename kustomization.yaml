@@ -1,0 +1,34 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: ollama-intel
+
+resources:
+  - namespace.yaml
+  - configmap.yaml
+  - statefulset.yaml
+  - service.yaml
+  - ingress.yaml
+
+labels:
+  - includeSelectors: true
+    pairs:
+      app.kubernetes.io/name: ollama-intel
+      app.kubernetes.io/component: inference
+
+# Синхронизирует TARGET_NODE из ConfigMap в nodeAffinity StatefulSet.
+replacements:
+  - source:
+      kind: ConfigMap
+      name: ollama-intel-config
+      fieldPath: data.TARGET_NODE
+    targets:
+      - select:
+          kind: StatefulSet
+          name: ollama-intel
+        fieldPaths:
+          - spec.template.spec.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms.0.matchExpressions.0.values.0
+
+images:
+  - name: intelanalytics/ipex-llm-inference-cpp-xpu
+    newTag: "2.2.0-SNAPSHOT"

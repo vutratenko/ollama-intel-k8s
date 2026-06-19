@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: ollama-intel
+  labels:
+    app.kubernetes.io/name: ollama-intel
+    app.kubernetes.io/component: inference
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: ollama-intel
+  ports:
+    - name: http
+      port: 11434
+      targetPort: http
+      protocol: TCP
