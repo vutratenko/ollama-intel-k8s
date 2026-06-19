@@ -1,18 +1,16 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-# Устанавливает Node Feature Discovery (NFD) и Intel GPU device plugin.
+# Intel GPU device plugin в namespace ollama (ArgoCD AppProject ollama).
 #
-# Порядок:
-#   1. kubectl apply -k ollama-intel/device-plugin/
-#   2. Дождаться метки intel.feature.node.kubernetes.io/gpu=true на целевой ноде
-#   3. kubectl apply -k ollama-intel/
+# Предварительно установите NFD — см. ../nfd/
+# Затем дождитесь метки intel.feature.node.kubernetes.io/gpu=true на целевой ноде.
 #
-# Если NFD уже установлен в кластере — закомментируйте remote resource ниже.
 # Чтобы plugin работал на всех GPU-нодах — уберите gpu-plugin-target-node.yaml из patches.
 
+namespace: ollama
+
 resources:
-  - https://github.com/intel/intel-device-plugins-for-kubernetes/deployments/nfd?ref=v0.36.0
   - configmap.yaml
   - intel-gpu-plugin.yaml
 
@@ -23,18 +21,18 @@ patches:
       version: v1
       kind: DaemonSet
       name: intel-gpu-plugin
-      namespace: kube-system
+      namespace: ollama
 
 replacements:
   - source:
       kind: ConfigMap
       name: device-plugin-config
-      namespace: kube-system
+      namespace: ollama
       fieldPath: data.TARGET_NODE
     targets:
       - select:
           kind: DaemonSet
           name: intel-gpu-plugin
-          namespace: kube-system
+          namespace: ollama
         fieldPaths:
           - spec.template.spec.nodeSelector.[kubernetes.io/hostname]

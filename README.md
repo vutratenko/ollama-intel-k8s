@@ -47,7 +47,7 @@ flowchart TB
             GPU["Intel GPU"]
         end
 
-        subgraph kube_system ["kube-system"]
+        subgraph ollama_ns ["ollama"]
             PLUGIN["DaemonSet intel-gpu-plugin"]
         end
 
@@ -67,7 +67,7 @@ flowchart TB
 | Компонент | Namespace | Назначение |
 |-----------|-----------|------------|
 | NFD | `node-feature-discovery` | Обнаруживает Intel GPU и проставляет метки на нодах |
-| Intel GPU plugin | `kube-system` | Регистрирует GPU как ресурс `gpu.intel.com/i915` или `gpu.intel.com/xe` |
+| Intel GPU plugin | `ollama` | Регистрирует GPU как ресурс `gpu.intel.com/i915` или `gpu.intel.com/xe` |
 | Ollama StatefulSet | `ollama` | Запускает Ollama с IPEX-LLM backend |
 | Service | `ollama` | Внутренний доступ к API на порту 11434 |
 | Ingress | `ollama` | Внешний HTTP-доступ |
@@ -95,25 +95,46 @@ flowchart TB
 
 ### Сеть
 
-- При `kubectl apply -k device-plugin/` нужен доступ к `github.com` (remote kustomize resource для NFD)
+- При `kubectl apply -k nfd/` нужен доступ к `github.com` (remote kustomize resource)
 
 ## Структура репозитория
 
 ```
 .
 ├── README.md
-├── kustomization.yaml          # Основной kustomize: Ollama
-├── namespace.yaml
-├── configmap.yaml              # Настройки Ollama и TARGET_NODE
+├── kustomization.yaml          # Kustomize: Ollama
+├── configmap.yaml
 ├── statefulset.yaml
 ├── service.yaml
 ├── ingress.yaml
-└── device-plugin/
-    ├── kustomization.yaml      # NFD + Intel GPU plugin
-    ├── configmap.yaml          # TARGET_NODE для plugin
-    ├── intel-gpu-plugin.yaml
-    └── gpu-plugin-target-node.yaml
+├── nfd/
+│   └── kustomization.yaml      # Node Feature Discovery (отдельно)
+├── device-plugin/
+│   ├── kustomization.yaml      # Intel GPU plugin (namespace ollama)
+│   ├── configmap.yaml
+│   ├── intel-gpu-plugin.yaml
+│   └── gpu-plugin-target-node.yaml
+└── argocd/
+    ├── application-device-plugin.yaml  # project: ollama
+    └── application-nfd.yaml            # project: default
 ```
+
+## ArgoCD
+
+AppProject **`ollama`** разрешает только namespace **`ollama`**. Поэтому:
+
+| Application | path | project | destination namespace |
+|-------------|------|---------|----------------------|
+| `ollama` (Ollama) | `.` | `ollama` | `ollama` |
+| `ollama-device-plugin` | `device-plugin` | `ollama` | `ollama` |
+| `ollama-nfd` | `nfd` | `default` | `node-feature-discovery` |
+
+```bash
+kubectl apply -f argocd/application-nfd.yaml
+kubectl apply -f argocd/application-device-plugin.yaml
+```
+
+NFD нужно установить **до** device plugin (метка `intel.feature.node.kubernetes.io/gpu=true`).
 
 ## Быстрый старт
 
@@ -148,34 +169,32 @@ data:
 - `ingress.yaml` — хост (`ollama.example.com`) и TLS
 - `statefulset.yaml` — `storageClassName`, лимиты CPU/RAM, тип GPU-ресурса
 
-### 3. Установить Intel GPU device plugin
+### 3. Установить NFD и Intel GPU device plugin
 
 ```bash
+# 1. Node Feature Discovery
+kubectl apply -k nfd/
+
+# 2. Дождаться метки GPU на целевой ноде
+kubectl get nodes -l intel.feature.node.kubernetes.io/gpu=true
+
+# 3. Intel GPU device plugin (namespace ollama)
 kubectl apply -k device-plugin/
 ```
 
-Дождитесь появления метки на целевой ноде:
-
 ```bash
-kubectl get nodes -l intel.feature.node.kubernetes.io/gpu=true
-kubectl -n kube-system get pods -l app=intel-gpu-plugin -o wide
+kubectl -n ollama get pods -l app=intel-gpu-plugin -o wide
+kubectl -n node-feature-discovery get pods
 ```
 
 Проверьте, что GPU зарегистрирован:
 
 ```bash
-kubectl describe node gpu-node-01 | grep -A5 "Allocatable"
+kubectl describe node cornertop | grep -A5 "Allocatable"
 # Ожидается: gpu.intel.com/i915: 1  (или gpu.intel.com/xe: 1)
 ```
 
-> **NFD уже установлен?** Закомментируйте remote resource в `device-plugin/kustomization.yaml`:
->
-> ```yaml
-> resources:
->   # - https://github.com/intel/.../deployments/nfd?ref=v0.36.0
->   - configmap.yaml
->   - intel-gpu-plugin.yaml
-> ```
+> **NFD уже установлен?** Пропустите `kubectl apply -k nfd/`.
 
 ### 4. Развернуть Ollama
 
@@ -409,7 +428,7 @@ kubectl -n ollama logs -f ollama-intel-0
 ### Plugin не стартует на ноде
 
 ```bash
-kubectl -n kube-system logs -l app=intel-gpu-plugin
+kubectl -n ollama logs -l app=intel-gpu-plugin
 kubectl describe node <node-name> | grep intel.feature
 ```
 

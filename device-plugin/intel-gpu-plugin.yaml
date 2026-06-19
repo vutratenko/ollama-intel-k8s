@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: DaemonSet
 metadata:
   name: intel-gpu-plugin
-  namespace: kube-system
+  namespace: ollama
   labels:
     app.kubernetes.io/name: intel-gpu-device-plugin
     app: intel-gpu-plugin

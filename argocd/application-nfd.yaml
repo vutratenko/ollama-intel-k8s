@@ -1,0 +1,21 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: ollama-nfd
+  namespace: argocd
+spec:
+  # NFD создаёт ресурсы в node-feature-discovery — вне AppProject ollama.
+  project: default
+  source:
+    repoURL: https://github.com/vutratenko/ollama-intel-k8s.git
+    targetRevision: master
+    path: nfd
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: node-feature-discovery
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

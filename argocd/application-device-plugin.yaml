@@ -1,0 +1,20 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: ollama-device-plugin
+  namespace: argocd
+spec:
+  project: ollama
+  source:
+    repoURL: https://github.com/vutratenko/ollama-intel-k8s.git
+    targetRevision: master
+    path: device-plugin
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: ollama
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false
