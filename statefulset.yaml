@@ -152,7 +152,7 @@ spec:
         accessModes:
           - ReadWriteOnce
         # Укажите StorageClass, доступный на целевой ноде.
-        storageClassName: local-path
+        storageClassName: nfs-ssd
         resources:
           requests:
-            storage: 100Gi
+            storage: 50Gi

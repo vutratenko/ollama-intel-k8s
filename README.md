@@ -38,7 +38,7 @@ flowchart TB
         ING["Ingress nginx"]
         SVC["Service :11434"]
         STS["StatefulSet ollama-intel"]
-        PVC[("PVC models 100Gi")]
+        PVC[("PVC models 50Gi nfs-ssd")]
         CM["ConfigMap ollama-intel-config"]
 
         subgraph gpu_node ["Нода с Intel GPU"]
@@ -79,7 +79,7 @@ flowchart TB
 - Kubernetes 1.28+ (рекомендуется; device plugin протестирован с [v0.36.0](https://github.com/intel/intel-device-plugins-for-kubernetes/releases/tag/v0.36.0))
 - `kubectl` и встроенный `kustomize` (`kubectl apply -k`)
 - Ingress Controller (nginx)
-- StorageClass для PVC (по умолчанию `local-path`, типичен для k3s)
+- StorageClass для PVC: `nfs-ssd`
 - Namespace приложения: **`ollama`** (соответствует ограничениям ArgoCD AppProject `ollama`)
 
 ### Нода с Intel GPU
@@ -290,13 +290,13 @@ volumeClaimTemplates:
   - metadata:
       name: models
     spec:
-      storageClassName: local-path
+      storageClassName: nfs-ssd
       resources:
         requests:
-          storage: 100Gi
+          storage: 50Gi
 ```
 
-Для одной ноды с `local-path` том создаётся на той же ноде, куда попадёт pod.
+Том создаётся на NFS и может монтироваться на любой ноде с доступом к `nfs-ssd`.
 
 ## Использование Ollama
 
