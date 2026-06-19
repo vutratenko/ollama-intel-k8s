@@ -28,10 +28,10 @@ spec:
                   - key: kubernetes.io/hostname
                     operator: In
                     values:
-                      - gpu-node-01
+                      - cornertop
       # Альтернатива: раскомментируйте nodeSelector и закомментируйте affinity выше.
       # nodeSelector:
-      #   kubernetes.io/hostname: gpu-node-01
+      #   kubernetes.io/hostname: cornertop
       terminationGracePeriodSeconds: 60
       containers:
         - name: ollama

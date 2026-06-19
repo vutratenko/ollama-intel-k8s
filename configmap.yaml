@@ -8,7 +8,7 @@ data:
   # Тип Intel GPU: Arc | Flex | Max | iGPU
   DEVICE: "Arc"
   # Имя ноды кластера с Intel GPU (kubectl get nodes)
-  TARGET_NODE: "gpu-node-01"
+  TARGET_NODE: "cornertop"
   # KMD-драйвер GPU на ноде: i915 (legacy) или xe (новые ядра)
   INTEL_GPU_RESOURCE: "gpu.intel.com/i915"
   # Выбор конкретного GPU при нескольких устройствах (0 — первый dGPU)

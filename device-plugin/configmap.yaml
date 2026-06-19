@@ -7,4 +7,4 @@ metadata:
 data:
   # Имя ноды с Intel GPU (kubectl get nodes).
   # Используется для ограничения DaemonSet plugin только этой нодой.
-  TARGET_NODE: "gpu-node-01"
+  TARGET_NODE: "cornertop"
