@@ -18,15 +18,23 @@ resources:
 
 patches:
   - path: gpu-plugin-target-node.yaml
+    target:
+      group: apps
+      version: v1
+      kind: DaemonSet
+      name: intel-gpu-plugin
+      namespace: kube-system
 
 replacements:
   - source:
       kind: ConfigMap
       name: device-plugin-config
+      namespace: kube-system
       fieldPath: data.TARGET_NODE
     targets:
       - select:
           kind: DaemonSet
           name: intel-gpu-plugin
+          namespace: kube-system
         fieldPaths:
-          - spec.template.spec.nodeSelector.kubernetes.io/hostname
+          - spec.template.spec.nodeSelector.[kubernetes.io/hostname]
