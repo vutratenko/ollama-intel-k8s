@@ -88,10 +88,10 @@ flowchart TB
 - Установленный драйвер GPU (`i915` или `xe` KMD)
 - Доступ к `/dev/dri` на хосте
 - Рекомендуемые ресурсы для pod Ollama:
-  - CPU: 4–16 cores
-  - RAM: 16–32 GiB
-  - GPU: 1 устройство Intel (Arc / Flex / Max / iGPU)
-  - Disk: 100 GiB+ для моделей
+  - CPU: 1 core (request), до 8 cores (limit)
+  - RAM: 4 GiB (request), до 16 GiB (limit)
+  - GPU: доступ через `hostPath` `/dev/dri` (device plugin опционален)
+  - Disk: 50 GiB+ для моделей (PVC `nfs-ssd`)
 
 ### Сеть
 

@@ -94,15 +94,14 @@ spec:
               exec tail -f /llm/ollama/ollama.log
           resources:
             requests:
-              cpu: "4"
-              memory: 16Gi
+              cpu: "1"
+              memory: 4Gi
             limits:
-              cpu: "16"
-              memory: 32Gi
-              # Требует Intel GPU device plugin:
-              # https://github.com/intel/intel-device-plugins-for-kubernetes
-              # Для xe KMD замените на gpu.intel.com/xe: "1"
-              gpu.intel.com/i915: "1"
+              cpu: "8"
+              memory: 16Gi
+              # GPU доступен через hostPath /dev/dri (privileged).
+              # Если используете Intel GPU device plugin, раскомментируйте:
+              # gpu.intel.com/i915: "1"   # или gpu.intel.com/xe: "1"
           securityContext:
             # Некоторые кластеры требуют privileged для прямого доступа к /dev/dri.
             # Если device plugin с CDI работает без ошибок — можно выставить false.
