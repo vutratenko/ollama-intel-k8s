@@ -68,9 +68,9 @@ flowchart TB
 |-----------|-----------|------------|
 | NFD | `node-feature-discovery` | Обнаруживает Intel GPU и проставляет метки на нодах |
 | Intel GPU plugin | `kube-system` | Регистрирует GPU как ресурс `gpu.intel.com/i915` или `gpu.intel.com/xe` |
-| Ollama StatefulSet | `ollama-intel` | Запускает Ollama с IPEX-LLM backend |
-| Service | `ollama-intel` | Внутренний доступ к API на порту 11434 |
-| Ingress | `ollama-intel` | Внешний HTTP-доступ |
+| Ollama StatefulSet | `ollama` | Запускает Ollama с IPEX-LLM backend |
+| Service | `ollama` | Внутренний доступ к API на порту 11434 |
+| Ingress | `ollama` | Внешний HTTP-доступ |
 
 ## Требования
 
@@ -80,6 +80,7 @@ flowchart TB
 - `kubectl` и встроенный `kustomize` (`kubectl apply -k`)
 - Ingress Controller (nginx)
 - StorageClass для PVC (по умолчанию `local-path`, типичен для k3s)
+- Namespace приложения: **`ollama`** (соответствует ограничениям ArgoCD AppProject `ollama`)
 
 ### Нода с Intel GPU
 
@@ -185,15 +186,15 @@ kubectl apply -k .
 Проверить статус:
 
 ```bash
-kubectl -n ollama-intel get pods -o wide
-kubectl -n ollama-intel logs -f statefulset/ollama-intel
+kubectl -n ollama get pods -o wide
+kubectl -n ollama logs -f statefulset/ollama-intel
 ```
 
 ### 5. Проверить API
 
 ```bash
 # Через port-forward (без Ingress)
-kubectl -n ollama-intel port-forward svc/ollama-intel 11434:11434
+kubectl -n ollama port-forward svc/ollama-intel 11434:11434
 
 curl http://localhost:11434/
 curl http://localhost:11434/api/tags
@@ -302,7 +303,7 @@ volumeClaimTemplates:
 ### Загрузка модели
 
 ```bash
-kubectl -n ollama-intel exec -it ollama-intel-0 -- bash -c \
+kubectl -n ollama exec -it ollama-intel-0 -- bash -c \
   'cd /llm/ollama && ./ollama pull llama3.2'
 ```
 
@@ -324,7 +325,7 @@ curl http://ollama.example.com/api/tags
 
 ### Интеграция с Open WebUI
 
-Укажите Ollama URL: `http://ollama-intel.ollama-intel.svc.cluster.local:11434` (внутри кластера) или внешний Ingress URL.
+Укажите Ollama URL: `http://ollama-intel.ollama.svc.cluster.local:11434` (внутри кластера) или внешний Ingress URL.
 
 ## Обновление и удаление
 
@@ -342,21 +343,21 @@ images:
 
 ```bash
 kubectl apply -k .
-kubectl -n ollama-intel rollout status statefulset/ollama-intel
+kubectl -n ollama rollout status statefulset/ollama-intel
 ```
 
 ### Удалить Ollama (сохранить PVC)
 
 ```bash
 kubectl delete -k . --ignore-not-found
-# PVC ollama-intel-models-ollama-intel-0 останется
+# PVC models-ollama-intel-0 останется
 ```
 
 ### Полное удаление включая модели
 
 ```bash
 kubectl delete -k . --ignore-not-found
-kubectl -n ollama-intel delete pvc -l app.kubernetes.io/name=ollama-intel
+kubectl -n ollama delete pvc -l app.kubernetes.io/name=ollama-intel
 ```
 
 ### Удалить device plugin
@@ -370,7 +371,7 @@ kubectl delete -k device-plugin/ --ignore-not-found
 ### Pod в Pending
 
 ```bash
-kubectl -n ollama-intel describe pod ollama-intel-0
+kubectl -n ollama describe pod ollama-intel-0
 ```
 
 Частые причины:
@@ -384,8 +385,8 @@ kubectl -n ollama-intel describe pod ollama-intel-0
 ### GPU не используется
 
 ```bash
-kubectl -n ollama-intel exec -it ollama-intel-0 -- sycl-ls
-kubectl -n ollama-intel logs ollama-intel-0 | grep -i gpu
+kubectl -n ollama exec -it ollama-intel-0 -- sycl-ls
+kubectl -n ollama logs ollama-intel-0 | grep -i gpu
 ```
 
 Убедитесь, что:
@@ -399,7 +400,7 @@ kubectl -n ollama-intel logs ollama-intel-0 | grep -i gpu
 Первый запуск может занять несколько минут (инициализация IPEX-LLM). Startup probe настроен на ~5 минут (`failureThreshold: 30`, `periodSeconds: 10`).
 
 ```bash
-kubectl -n ollama-intel logs -f ollama-intel-0
+kubectl -n ollama logs -f ollama-intel-0
 # Лог Ollama: /llm/ollama/ollama.log
 ```
 
